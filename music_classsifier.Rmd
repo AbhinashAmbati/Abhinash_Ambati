@@ -1,0 +1,448 @@
+---
+title: "music_classsifier"
+author: "Abhinash Ambati"
+date: "10/19/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+ 
+```{r message=FALSE, warning=FALSE, include=FALSE, paged.print=TRUE} 
+#Including Libraries library(tidyverse) library(GGally) library(psych) library(rpart) library(rpart.plot) library(e1071) library(caret) library(class) library(forecast) library(ggcorrplot) library(VIM) library(neuralnet) 
+library(gains) 
+``` 
+ 
+```{r include=FALSE} # Loading Datasets 
+music_genre_data <- read.csv("~/Downloads/Course Materials/IE 7275 - Data Mining in Engineering/Assignments/Case Study/Data/data.csv", stringsAsFactors = T) 
+``` 
+ 
+# 2. Data Exploration and Visualization 
+ 
+## i. Cleaning Data 
+```{r} 
+#Checking for na values 
+colSums(sapply(music_genre_data, is.na)) aggr(music_genre_data) 
+ 
+#Remove Unessesary variables 
+music_genre_data <- music_genre_data[,-1] 
+#we found that the first column "filename" is useless for our classification and training the data.  ``` 
+* We found that there are no missing values in the data and removed the Unessesary columns. 
+ 
+## ii. Visualizing Data 
+```{r} 
+ggplot(data = music_genre_data)+   geom_bar(mapping = aes(x=label), color= 'saddlebrown',fill = 'peachpuff1')+scale_x_discrete("Music Genre")+ylim(0,120)+   labs( x="Music Genre", y="No of songs") 
+#we see all genres classes have equal number of records in the dataset. 
+ 
+ 
+ 
+#Boxplot for Tempo vs Beats 
+figs1 =ggplot(music_genre_data) + geom_point(mapping = aes(x= tempo, y= beats), color = 'olivedrab4') +   labs( x="TEMPO", y="BEATS")+ 
+  ggtitle("Tempo vs Beats") 
+ 
+ 
+figs2 =ggplot(music_genre_data) + geom_point(mapping = aes(x= spectral_centroid, y= spectral_bandwidth), color = 'olivedrab') +   labs( x="Spectral centroid", y="Spectral bandwidth")+   ggtitle("Spectral centroid vs Spectral_bandwidth") 
+ 
+ 
+figs3 =ggplot(music_genre_data) + geom_point(mapping = aes(x= chroma_stft, y= rmse), color = 'olivedrab3') +   labs( x="Chroma Stft", y="RMSE")+ 
+  ggtitle("Chroma Stft vs RMSE") 
+ 
+figs4 = ggplot(music_genre_data) + geom_point(mapping = aes(x= rolloff, y= zero_crossing_rate), color = 'olivedrab2') +   labs( x="Rolloff", y="Zero crossing rate")+ 
+  ggtitle("Rolloff vs Zero crossing rate") 
+ 
+ 
+ 
+gridExtra::grid.arrange(figs1, figs2, figs3, figs4, ncol=2) 
+ 
+ 
+ 
+ 
+#Histogram to show distribution of different observation data  
+ 
+ 
+figh1 = ggplot(data = music_genre_data)+ 
+  geom_histogram(mapping = aes(x=tempo), color= 'saddlebrown',fill = 'peachpuff1') 
+ 
+figh2 = ggplot(data = music_genre_data)+ 
+  geom_histogram(mapping = aes(x=beats), color= 'saddlebrown',fill = 'peachpuff1') 
+ 
+figh3 = ggplot(data = music_genre_data)+ 
+  geom_histogram(mapping = aes(x=rmse), color= 'saddlebrown',fill = 'peachpuff1') 
+ 
+figh4 = ggplot(data = music_genre_data)+ 
+  geom_histogram(mapping = aes(x=spectral_centroid), color= 'saddlebrown',fill = 'peachpuff1') 
+ 
+figh5 = ggplot(data = music_genre_data)+ 
+  geom_histogram(mapping = aes(x=spectral_bandwidth), color= 'saddlebrown',fill = 'peachpuff1') 
+ 
+figh6 = ggplot(data = music_genre_data)+ 
+  geom_histogram(mapping = aes(x=rolloff), color= 'saddlebrown',fill = 'peachpuff1') 
+ 
+figh7 = ggplot(data = music_genre_data)+ 
+  geom_histogram(mapping = aes(x=zero_crossing_rate), color= 'saddlebrown',fill = 'peachpuff1') 
+ 
+figh8 = ggplot(data = music_genre_data)+ 
+  geom_histogram(mapping = aes(x=mfcc6), color= 'saddlebrown',fill = 'peachpuff1') 
+ 
+figh9 = ggplot(data = music_genre_data)+ 
+  geom_histogram(mapping = aes(x=chroma_stft), color= 'saddlebrown',fill = 'peachpuff1') 
+ 
+gridExtra::grid.arrange(figh1, figh2, figh3, figh4,figh5,figh6,figh7,figh8,figh9, ncol=3) 
+ 
+ 
+#Box-plots for labels 
+ 
+fig1 <- ggplot(music_genre_data) + geom_boxplot(mapping = aes(x= label, y= tempo), fill = 'grey') +  
+  ggtitle("tempo vs Label") 
+ 
+fig2 <-  ggplot(music_genre_data) + geom_boxplot(mapping = aes(x= label, y= beats), fill = 'skyblue') +  
+  ggtitle("beats vs Label") 
+ 
+fig3 <- ggplot(music_genre_data) + geom_boxplot(mapping = aes(x= label, y= chroma_stft), fill = 'yellow') +  
+  ggtitle("chroma_stft vs Label")  
+ 
+fig4 <- ggplot(music_genre_data) + geom_boxplot(mapping = aes(x= label, y= rmse), fill 
+= 'navyblue') +    ggtitle("rmse vs Label") 
+ 
+fig5 <- ggplot(music_genre_data) + geom_boxplot(mapping = aes(x= label, y= spectral_centroid), fill = 'red') +  
+  ggtitle("spectral_centroid vs Label") 
+ 
+fig6 <- ggplot(music_genre_data) + geom_boxplot(mapping = aes(x= label, y= spectral_bandwidth), fill = 'orange') +  
+  ggtitle("spectral_bandwidth vs Label") 
+ 
+fig7 <- ggplot(music_genre_data) + geom_boxplot(mapping = aes(x= label, y= rolloff), fill = '#E46726') +  
+  ggtitle("rolloff vs Label") 
+ 
+fig8 <- ggplot(music_genre_data) + geom_boxplot(mapping = aes(x= label, y= zero_crossing_rate), fill = 'lightgreen') +    ggtitle("zero_crossing_rate vs Label") 
+ 
+fig9 <- ggplot(music_genre_data) + geom_boxplot(mapping = aes(x= label, y= mfcc1), fill = 'violet') +  
+  ggtitle("mfcc1 vs Label") 
+ 
+gridExtra::grid.arrange(fig1, fig2, fig3, fig4,fig5,fig6,fig7,fig8,fig9, ncol=3) 
+ 
+#Plots for MFCC 
+ 
+fig11 <- ggplot(data = music_genre_data)+ 
+  geom_line(mapping = aes(x =label ,y= mfcc1,), color = 'magenta') 
+ 
+fig12 <- ggplot(data = music_genre_data)+ 
+  geom_line(mapping = aes(x =label ,y= mfcc3 ), color = 'magenta1') 
+ 
+fig13 <- ggplot(data = music_genre_data)+ 
+  geom_line(mapping = aes(x =label ,y= mfcc5 ), color = 'magenta1') 
+ 
+fig14 <- ggplot(data = music_genre_data)+ 
+  geom_line(mapping = aes(x =label ,y= mfcc11 ), color = 'magenta3') 
+ 
+fig15 <- ggplot(data = music_genre_data)+ 
+  geom_line(mapping = aes(x =label ,y= mfcc2 ), color = 'magenta4') fig16 <- ggplot(data = music_genre_data)+ 
+  geom_line(mapping = aes(x =label ,y= mfcc18), color = 'maroon') 
+ 
+fig17 <- ggplot(data = music_genre_data)+ 
+  geom_line(mapping = aes(x =label ,y= mfcc16 ), color = 'maroon1') fig18 <- ggplot(data = music_genre_data)+ 
+  geom_line(mapping = aes(x =label ,y= mfcc20 ), color = 'maroon3') fig19 <- ggplot(data = music_genre_data)+ 
+  geom_line(mapping = aes(x =label ,y= mfcc13 ), color = 'maroon4') 
+ 
+ 
+ 
+gridExtra::grid.arrange(fig11, fig12, fig13, fig14,fig15,fig16,fig17,fig18,fig19, ncol=3) 
+ 
+boxplot(log(music_genre_data[,-29]), col = "lightgreen") 
+ 
+#Corelation-Graph 
+corr <- round(cor(music_genre_data[,-29]), 1) ggcorrplot(corr, lab = TRUE,            outline.col = "white",            ggtheme = ggplot2::theme_gray, 
+           colors = c("#6D9EC1", "white", "#E46726")) 
+``` 
+ 
+ 
+# 3. Data Preparation and Preprocessing 
+ 
+```{r} 
+str(music_genre_data) 
+ 
+summary(music_genre_data) 
+ 
+# Our response variable is label which shows the genre classes.  
+# All predictor variables are numerical variables except for the reponse/dependent variable. 
+``` 
+### i. Variable Selection 
+```{r} 
+#Corelation-Graph 
+corr <- round(cor(music_genre_data[,-29]), 1) 
+ggcorrplot(corr,  lab = TRUE,            outline.col = "white",            ggtheme = ggplot2::theme_gray, 
+           colors = c("#6D9EC1", "white", "#E46726")) 
+#From Correlation we see that beats and tempo are highly correlated so we are removing beats 
+#From Correlation we see that rolloff and spectral_centroid and spectral_bandwidth are highly correlated so we are removing spectral_centroid, spectral_bandwidth. music_genre_data <- music_genre_data[,c(-2,-5,-6)] 
+``` 
+ 
+### ii. PCA ```{r} 
+cor(music_genre_data[,-26]) 
+ 
+fa.parallel(music_genre_data[,-26], fa="pc", n.iter=100,show.legend = T) 
+ 
+# we get to know that we have to use 5 components. 
+ 
+p <- principal(data.frame(music_genre_data[,-26]), nfactors = 4, rotate = "none") p$scores 
+ 
+pca_genre <- cbind.data.frame( p$scores, Genre = music_genre_data$label) pca_genre 
+ 
+ 
+ 
+# Splitting PCA data 
+ 
+set.seed(100) 
+train_index <- sample(1:nrow(pca_genre), 0.6 * nrow(pca_genre)) 
+valid_index <- sample(setdiff(1:nrow(pca_genre), train_index),0.2*nrow(pca_genre)) test_index <- setdiff(1:nrow(pca_genre), union(train_index, valid_index)) 
+ 
+train_df_pca <- pca_genre[train_index, ] valid_df_pca <- pca_genre[valid_index, ] 
+test_df_pca <- pca_genre[test_index, ] 
+``` 
+ 
+### iii. Standardizing Data  
+```{r} 
+ 
+Standard_data <- music_genre_data 
+ 
+Standard_data[,-26] <- scale(Standard_data[,-26], center = T, scale = T) 
+ 
+#Splitting normal data 
+train_index <- sample(1:nrow(Standard_data), 0.6 * nrow(Standard_data)) valid_index <- sample(setdiff(1:nrow(Standard_data), train_index),0.2*nrow(Standard_data)) 
+test_index <- setdiff(1:nrow(Standard_data), union(train_index, valid_index)) 
+ 
+train_df_stand <- Standard_data[train_index, ] valid_df_stand <- Standard_data[valid_index, ] 
+test_df_stand <- Standard_data[test_index, ] 
+``` 
+ 
+### iv. Normalizing Data  
+```{r} 
+ 
+normal_data <- music_genre_data 
+ 
+normalize <- function(x){ 
+return ((x - min(x))/(max(x) - min(x))) 
+} 
+ 
+normal_data[,-26] <- as.data.frame(lapply(normal_data[,-26], normalize)) 
+ 
+#Splitting normal data 
+train_index <- sample(1:nrow(normal_data), 0.6 * nrow(normal_data)) valid_index <- sample(setdiff(1:nrow(normal_data), train_index),0.2*nrow(normal_data)) 
+test_index <- setdiff(1:nrow(normal_data), union(train_index, valid_index)) 
+ 
+train_df_norm <- normal_data[train_index, ] valid_df_norm <- normal_data[valid_index, ] 
+test_df_norm <- normal_data[test_index, ] 
+``` 
+ 
+ 
+### v. Making binary classes 
+```{r} 
+#All traditional music is "0" and modern music is "1" 
+ 
+music_new_binary_class <- music_genre_data 
+music_new_binary_class$label <- as.character(music_genre_data$label) summary(music_genre_data$label) music_new_binary_class$label[music_new_binary_class$label == "blues"] <- 0 music_new_binary_class$label[music_new_binary_class$label == "classical"] <- 0 music_new_binary_class$label[music_new_binary_class$label == "rock"] <- 0 music_new_binary_class$label[music_new_binary_class$label == "reggae"] <- 0 music_new_binary_class$label[music_new_binary_class$label == "country"] <- 0 music_new_binary_class$label[music_new_binary_class$label == "pop"] <- 1 music_new_binary_class$label[music_new_binary_class$label == "jazz"] <- 1  music_new_binary_class$label[music_new_binary_class$label == "metal"] <- 1 music_new_binary_class$label[music_new_binary_class$label == "hiphop"] <- 1 music_new_binary_class$label[music_new_binary_class$label == "disco"] <- 1 
+ 
+music_new_binary_class$label <- as.numeric(music_new_binary_class$label) 
+ 
+ 
+normalize <- function(x){ 
+return ((x - min(x))/(max(x) - min(x))) 
+} 
+ 
+normal_data<- as.data.frame(lapply(music_new_binary_class, normalize)) 
+ 
+#Splitting normal data 
+train_index <- sample(1:nrow(normal_data), 0.6 * nrow(normal_data)) valid_index <- sample(setdiff(1:nrow(normal_data), train_index),0.2*nrow(normal_data)) 
+test_index <- setdiff(1:nrow(normal_data), union(train_index, valid_index)) 
+ 
+train_df_norm_binary <- normal_data[train_index, ] valid_df_norm_binary <- normal_data[valid_index, ] test_df_norm_binary <- normal_data[test_index, ] 
+ 
+``` 
+ 
+### vi. Making binary classes 
+```{r} 
+music_new_binary_class <- music_genre_data 
+music_new_binary_class$label <- as.character(music_genre_data$label) summary(music_genre_data$label) 
+music_new_binary_class$label[music_new_binary_class$label == "blues"] <- 
+"Traditional" 
+music_new_binary_class$label[music_new_binary_class$label == "classical"] <- 
+"Traditional" 
+music_new_binary_class$label[music_new_binary_class$label == "rock"] <- 
+"Traditional" 
+music_new_binary_class$label[music_new_binary_class$label == "reggae"] <- 
+"Traditional" 
+music_new_binary_class$label[music_new_binary_class$label == "country"] <- "Traditional" 
+ 
+music_new_binary_class$label[music_new_binary_class$label == "pop"] <- "Modern" music_new_binary_class$label[music_new_binary_class$label == "jazz"] <- "Modern" music_new_binary_class$label[music_new_binary_class$label == "metal"] <- "Modern" music_new_binary_class$label[music_new_binary_class$label == "hiphop"] <- 
+"Modern" 
+music_new_binary_class$label[music_new_binary_class$label == "disco"] <- "Modern" 
+ 
+music_new_binary_class$label <- as.numeric(music_new_binary_class$label) 
+ 
+ 
+normalize <- function(x){ 
+return ((x - min(x))/(max(x) - min(x))) 
+} 
+ 
+normal_data<- as.data.frame(lapply(music_new_binary_class, normalize)) 
+ 
+#Splitting normal data 
+train_index <- sample(1:nrow(music_new_binary_class), 0.6 * nrow(music_new_binary_class)) 
+valid_index <- sample(setdiff(1:nrow(music_new_binary_class), train_index),0.2*nrow(music_new_binary_class)) 
+test_index <- setdiff(1:nrow(music_new_binary_class), union(train_index, valid_index)) 
+ 
+train_df_norm_binary <- music_new_binary_class[train_index, ] valid_df_norm_binary <- music_new_binary_class[valid_index, ] test_df_norm_binary <- music_new_binary_class[test_index, ] 
+``` 
+ 
+ 
+# 4. Data Mining Techniques and Implementation &  5. Performance Evaluation 
+ 
+## Algorithms 
+ 
+### i. KNN 
+ 
+```{r} 
+knn_genre <- knn(train = train_df_stand[,-26, drop = T], test = valid_df_stand[,-26, drop = T], cl =  train_df_stand[,26], k = 3) 
+ 
+ 
+knn_genre_test <- knn(train = train_df_stand[,-26, drop = T], test = test_df_stand[,-26, drop = T], cl =  train_df_stand[,26], k = 3) 
+ 
+confusionMatrix(knn_genre, valid_df_stand[,26]) 
+confusionMatrix(knn_genre_test, test_df_stand[,26]) 
+ 
+``` 
+ 
+### ii. Full Tree 
+ 
+```{r} # Full tree 
+tree <- rpart(label ~ ., data = train_df_stand, method = "class") rpart.plot(tree) 
+ 
+tree$variable.importance 
+ 
+confusionMatrix(predict(tree, valid_df_stand[,-26], type = "class"),valid_df_stand[,26]) confusionMatrix(predict(tree, test_df_stand[,-26], type = "class"),test_df_stand[,26]) 
+``` 
+ 
+### iii. Pruned Tree 
+```{r} 
+#Pruned  
+ 
+pru_tree <- rpart(label ~ ., data = train_df_stand, method = "class",                 cp = 0.00001, minsplit = 5, xval = 5) 
+ 
+pruned_tree <- prune(pru_tree, cp = 
+pru_tree$cptable[which.min(pru_tree$cptable[,"xerror"]),"CP"]) prp(pruned_tree) 
+ 
+ 
+confusionMatrix(predict(pruned_tree, valid_df_stand[,-26], type = 
+"class"),valid_df_stand[,26]) 
+confusionMatrix(predict(pruned_tree, test_df_stand[,-26], type = 
+"class"),test_df_stand[,26]) 
+# We got same accuracy and performance for best pruned valudation and testing set. 
+``` 
+ 
+### iv. Random Forest  
+```{r} 
+rf <- randomForest::randomForest(label ~ ., data = train_df_stand, ntree = 600, proximity 
+= TRUE) 
+ 
+confusionMatrix(predict(rf, valid_df_stand[,-26], type = "class"),valid_df_stand[,26]) 
+ 
+confusionMatrix(predict(rf, test_df_stand[,-26], type = "class"),test_df_stand[,26]) 
+ 
+``` 
+ 
+ 
+### v. Multinominal Logistic Regression ```{r} 
+library(nnet) 
+#Applied on PCA data 
+mlr_pca <- multinom(Genre~., train_df_pca) 
+ 
+ 
+confusionMatrix(predict(mlr_pca,valid_df_pca[,-5]),valid_df_pca[,5]) confusionMatrix(predict(mlr_pca,test_df_pca[,-5]),test_df_pca[,5]) 
+ 
+ 
+#Applied on Standardized data mlr <- multinom(label~., train_df_stand) 
+ 
+ 
+ 
+confusionMatrix(predict(mlr,valid_df_stand[,-26]),valid_df_stand[,26]) confusionMatrix(predict(mlr,test_df_stand[,-26]),test_df_stand[,26]) 
+ 
+ 
+ 
+``` 
+ 
+### vi. Neural Network 
+```{r} 
+names_of_data <- colnames(train_df_norm_binary) 
+Name<- as.formula(paste("label~", paste(names_of_data[!names_of_data %in% "label"], collapse = "+")))  
+ 
+ 
+nn_model <- neuralnet(Name, data = train_df_norm_binary,  
+                        linear.output = F, hidden = c(10,10),  err.fct = "ce") plot(nn_model) 
+ 
+nn_pred <- compute(nn_model,valid_df_norm_binary[,-26]) nn_pred_out <- ifelse(nn_pred$net.result>0.5, 1,0 ) 
+confusionMatrix(as.factor(nn_pred_out),as.factor(valid_df_norm_binary[,26])) 
+ 
+ 
+#test check  nn_pred_t <- compute(nn_model,test_df_norm_binary[,-26]) nn_pred_out_t <- ifelse(nn_pred_t$net.result>0.5, 1,0 ) 
+confusionMatrix(as.factor(nn_pred_out_t),as.factor(test_df_norm_binary[,26])) 
+ 
+ 
+#Lift chart 
+gain <- gains(valid_df_norm_binary$label, nn_pred$net.result, groups=100) plot(c(0,gain$cume.pct.of.total*sum(valid_df_norm_binary$label == 
+1))~c(0,gain$cume.obs),       xlab="# cases", ylab="Cumulative", main="Neural Network Lift", type="l") lines(c(0,sum(valid_df_norm_binary$label == 1))~c(0, dim(valid_df_norm_binary)[1]), lty=2) 
+ 
+ 
+``` 
+ 
+### vii. Classification Tree for Binary  
+ 
+```{r} 
+tree_1 <- rpart(label ~ ., data = train_df_norm_binary, method = "class") rpart.plot(tree_1) 
+prp(tree_1) 
+ 
+confusionMatrix(predict(tree_1, valid_df_norm_binary[,-26], type = 
+"class"),as.factor(valid_df_norm_binary[,26])) 
+ 
+confusionMatrix(predict(tree_1, test_df_norm_binary[,-26], type = 
+"class"),as.factor(test_df_norm_binary[,26])) 
+ 
+``` 
+ 
+### viii.  Random Forest for Binary 
+```{r} 
+rf_1 <- randomForest::randomForest(as.factor(label) ~ ., data = train_df_norm_binary, ntree = 700, proximity = TRUE) 
+ 
+confusionMatrix(predict(rf_1, valid_df_norm_binary[,-26], type = 
+"class"),as.factor(valid_df_norm_binary[,26])) 
+confusionMatrix(predict(rf_1, test_df_norm_binary[,-26], type = 
+"class"),as.factor(test_df_norm_binary[,26])) 
+ 
+``` 
+### ix. Logistic Regression For Binary Data 
+```{r} 
+lr <- glm(label~., train_df_norm_binary, family = "binomial") summary(lr) lr_v<- predict(lr,valid_df_norm_binary[,-26], type = "response") lr_t <- predict(lr,test_df_norm_binary[,-26], type = "response") confusionMatrix(as.factor(ifelse(lr_v >= 0.5,1,0)),as.factor(valid_df_norm_binary[,26])) confusionMatrix(as.factor(ifelse(lr_t >= 0.5,1,0)),as.factor(test_df_norm_binary[,26])) library(gains) gain <- gains(valid_df_norm_binary$label, lr_v, groups=100) plot(c(0,gain$cume.pct.of.total*sum(valid_df_norm_binary$label == 
+1))~c(0,gain$cume.obs),       xlab="# cases", ylab="Cumulative", main="Logistic Regression Lift", type="l") lines(c(0,sum(valid_df_norm_binary$label == 1))~c(0, dim(valid_df_norm_binary)[1]), lty=2) 
+ 
+``` 
+ 
+
